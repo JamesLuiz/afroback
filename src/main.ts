@@ -3,7 +3,8 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const corsOrigin = process.env.CORS_ORIGIN ?? 'http://localhost:3001';
+  const corsOrigin =
+    process.env.CORS_ORIGIN ?? 'http://localhost:3001,https://afrobite.vercel.app';
   const origins = corsOrigin.split(',').map((origin) => origin.trim());
   app.enableCors({
     origin: origins,
