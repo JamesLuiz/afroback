@@ -1,14 +1,8 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, NotFoundException, Param, Post } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CurrentUserService } from '../common/current-user.service';
 import { DatabaseService } from '../database/database.service';
-
-type CheckoutPayload = {
-  restaurantId?: string;
-  items?: { productId: string; quantity: number }[];
-  deliveryAddress?: string;
-  notes?: string;
-};
+import { CreateOrderDto } from './dto/create-order.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -20,14 +14,14 @@ export class OrdersController {
   @Post()
   async create(
     @Headers('authorization') authorization: string | undefined,
-    @Body() body: CheckoutPayload,
+    @Body() body: CreateOrderDto,
   ) {
     const user = await this.currentUserService.fromAuthorization(authorization);
-    const cartItems = body.items ?? [];
+    const cartItems = body.items;
     const restaurant = await this.database.restaurants.findOne({ id: body.restaurantId });
 
-    if (!restaurant || cartItems.length === 0) {
-      return { message: 'Invalid checkout payload' };
+    if (!restaurant) {
+      throw new BadRequestException('Restaurant not found');
     }
 
     const productIds = cartItems.map((item) => item.productId);
@@ -37,13 +31,16 @@ export class OrdersController {
       (sum, item) => sum + (priceMap.get(item.productId) ?? 0) * item.quantity,
       0,
     );
+    if (subtotal <= 0) {
+      throw new BadRequestException('Order items are invalid');
+    }
 
     const newOrder = {
       id: randomUUID(),
       userId: user.id,
       restaurantId: restaurant.id,
       items: cartItems,
-      deliveryAddress: body.deliveryAddress ?? 'Unknown address',
+      deliveryAddress: body.deliveryAddress,
       notes: body.notes,
       subtotal: Number(subtotal.toFixed(2)),
       deliveryFee: restaurant.deliveryFee,
@@ -67,7 +64,7 @@ export class OrdersController {
     const user = await this.currentUserService.fromAuthorization(authorization);
     const order = await this.database.orders.findOne({ id, userId: user.id });
     if (!order) {
-      return null;
+      throw new NotFoundException('Order not found');
     }
     return {
       orderId: order.id,

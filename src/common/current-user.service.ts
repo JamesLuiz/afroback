@@ -15,6 +15,10 @@ export class CurrentUserService {
     if (!session) {
       throw new UnauthorizedException('Invalid token');
     }
+    if (new Date(session.expiresAt).getTime() <= Date.now()) {
+      await this.database.sessions.deleteOne({ token });
+      throw new UnauthorizedException('Session expired');
+    }
 
     const user = await this.database.users.findOne({ id: session.userId });
     if (!user) {

@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { DatabaseService } from '../database/database.service';
 
@@ -16,17 +17,19 @@ export class AuthService {
     const user = {
       id: randomUUID(),
       email: normalizedEmail,
-      password,
+      password: await hash(password, 12),
       fullName,
       createdAt: new Date().toISOString(),
     };
     await this.database.users.insertOne(user);
 
     const token = randomUUID();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
     await this.database.sessions.insertOne({
       token,
       userId: user.id,
       createdAt: new Date().toISOString(),
+      expiresAt,
     });
 
     return {
@@ -42,15 +45,17 @@ export class AuthService {
   async login(email: string, password: string) {
     const normalizedEmail = email.trim().toLowerCase();
     const user = await this.database.users.findOne({ email: normalizedEmail });
-    if (!user || user.password !== password) {
+    if (!user || !(await compare(password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const token = randomUUID();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
     await this.database.sessions.insertOne({
       token,
       userId: user.id,
       createdAt: new Date().toISOString(),
+      expiresAt,
     });
 
     return {

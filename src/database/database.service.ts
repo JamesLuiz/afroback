@@ -14,6 +14,7 @@ export type DbSession = {
   token: string;
   userId: string;
   createdAt: string;
+  expiresAt: string;
 };
 
 export type DbRestaurant = (typeof restaurantsSeed)[number];
@@ -57,6 +58,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
     await this.users.createIndex({ email: 1 }, { unique: true });
     await this.sessions.createIndex({ token: 1 }, { unique: true });
+    await this.sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     await this.orders.createIndex({ userId: 1, createdAt: -1 });
 
     const restaurantsCount = await this.restaurants.countDocuments();
